@@ -1,0 +1,3 @@
+[submodule "pgn_analizer_protos"]
+	path = pgn_analizer_protos
+	url = https://github.com/ruziba3vich/pgn_analizer_protos.git
