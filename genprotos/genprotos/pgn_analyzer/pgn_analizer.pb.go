@@ -243,6 +243,7 @@ type PlayerEloAnalysis struct {
 	Opening       int32                  `protobuf:"varint,1,opt,name=opening,proto3" json:"opening,omitempty"`
 	Middlegame    int32                  `protobuf:"varint,2,opt,name=middlegame,proto3" json:"middlegame,omitempty"`
 	Endgame       int32                  `protobuf:"varint,3,opt,name=endgame,proto3" json:"endgame,omitempty"`
+	Overall       int32                  `protobuf:"varint,4,opt,name=overall,proto3" json:"overall,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -294,6 +295,13 @@ func (x *PlayerEloAnalysis) GetMiddlegame() int32 {
 func (x *PlayerEloAnalysis) GetEndgame() int32 {
 	if x != nil {
 		return x.Endgame
+	}
+	return 0
+}
+
+func (x *PlayerEloAnalysis) GetOverall() int32 {
+	if x != nil {
+		return x.Overall
 	}
 	return 0
 }
@@ -698,13 +706,14 @@ const file_pgn_analizer_protos_pgn_analizer_proto_rawDesc = "" +
 	"\x05depth\x18\x02 \x01(\x05R\x05depth\"\x82\x01\n" +
 	"\x12AnalyzePGNResponse\x125\n" +
 	"\x05white\x18\x01 \x01(\v2\x1f.pgn_analyzer.PlayerEloAnalysisR\x05white\x125\n" +
-	"\x05black\x18\x02 \x01(\v2\x1f.pgn_analyzer.PlayerEloAnalysisR\x05black\"g\n" +
+	"\x05black\x18\x02 \x01(\v2\x1f.pgn_analyzer.PlayerEloAnalysisR\x05black\"\x81\x01\n" +
 	"\x11PlayerEloAnalysis\x12\x18\n" +
 	"\aopening\x18\x01 \x01(\x05R\aopening\x12\x1e\n" +
 	"\n" +
 	"middlegame\x18\x02 \x01(\x05R\n" +
 	"middlegame\x12\x18\n" +
-	"\aendgame\x18\x03 \x01(\x05R\aendgame\"\xd4\x02\n" +
+	"\aendgame\x18\x03 \x01(\x05R\aendgame\x12\x18\n" +
+	"\aoverall\x18\x04 \x01(\x05R\aoverall\"\xd4\x02\n" +
 	"\x18DetailedAnalysisResponse\x125\n" +
 	"\x05white\x18\x01 \x01(\v2\x1f.pgn_analyzer.PlayerEloAnalysisR\x05white\x125\n" +
 	"\x05black\x18\x02 \x01(\v2\x1f.pgn_analyzer.PlayerEloAnalysisR\x05black\x12@\n" +
