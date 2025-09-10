@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -19,11 +20,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	pb "github.com/yourorg/chess-analysis/proto/analysis"
+	pb "github.com/ruziba3vich/game_analyzer_service/genprotos/genprotos/pgn_analyzer"
 )
 
 const (
-	defaultPort         = ":50051"
+	defaultPort          = ":8000"
 	defaultAnalysisDepth = 15
 	maxAnalysisDepth     = 25
 	minMovesForAnalysis  = 10
@@ -111,6 +112,74 @@ func NewChessAnalysisServer(enginePool *EnginePool) *ChessAnalysisServer {
 	}
 }
 
+// parsePGN parses a PGN string and returns a chess game
+func parsePGN(pgnStr string) (*chess.Game, error) {
+	if strings.TrimSpace(pgnStr) == "" {
+		return nil, fmt.Errorf("empty PGN string")
+	}
+
+	game := chess.NewGame()
+
+	// Remove PGN headers (anything in square brackets)
+	headerRegex := regexp.MustCompile(`\[.*?\]`)
+	cleanPGN := headerRegex.ReplaceAllString(pgnStr, "")
+
+	// Remove comments (anything in curly braces)
+	commentRegex := regexp.MustCompile(`\{[^}]*\}`)
+	cleanPGN = commentRegex.ReplaceAllString(cleanPGN, "")
+
+	// Remove line breaks and normalize whitespace
+	cleanPGN = strings.ReplaceAll(cleanPGN, "\n", " ")
+	cleanPGN = strings.ReplaceAll(cleanPGN, "\r", " ")
+	cleanPGN = strings.ReplaceAll(cleanPGN, "\t", " ")
+
+	// Replace multiple spaces with single space
+	spaceRegex := regexp.MustCompile(`\s+`)
+	cleanPGN = spaceRegex.ReplaceAllString(cleanPGN, " ")
+	cleanPGN = strings.TrimSpace(cleanPGN)
+
+	// Split into tokens
+	tokens := strings.Fields(cleanPGN)
+
+	for _, token := range tokens {
+		// Skip move numbers (e.g., "1.", "15.", etc.)
+		moveNumberRegex := regexp.MustCompile(`^\d+\.+$`)
+		if moveNumberRegex.MatchString(token) {
+			continue
+		}
+
+		// Skip game results
+		if token == "1-0" || token == "0-1" || token == "1/2-1/2" || token == "*" {
+			break
+		}
+
+		// Clean annotations from the move (remove trailing !, ?, +, #)
+		annotationRegex := regexp.MustCompile(`[!?+#]+$`)
+		cleanMove := annotationRegex.ReplaceAllString(token, "")
+
+		if cleanMove == "" {
+			continue
+		}
+
+		// Try to decode the move using algebraic notation
+		move, err := chess.AlgebraicNotation{}.Decode(game.Position(), cleanMove)
+		if err != nil {
+			// Try UCI notation as fallback
+			move, err = chess.UCINotation{}.Decode(game.Position(), cleanMove)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse move '%s' at position %s: %v", cleanMove, game.Position().String(), err)
+			}
+		}
+
+		// Apply the move to the game
+		if err := game.Move(move); err != nil {
+			return nil, fmt.Errorf("illegal move '%s' at position %s: %v", cleanMove, game.Position().String(), err)
+		}
+	}
+
+	return game, nil
+}
+
 // AnalyzePGN implements the main analysis RPC
 func (s *ChessAnalysisServer) AnalyzePGN(ctx context.Context, req *pb.AnalyzePGNRequest) (*pb.AnalyzePGNResponse, error) {
 	// Validate request
@@ -128,8 +197,8 @@ func (s *ChessAnalysisServer) AnalyzePGN(ctx context.Context, req *pb.AnalyzePGN
 
 	log.Printf("Starting PGN analysis (depth: %d)", depth)
 
-	// Parse PGN
-	game, err := chess.NewGameFromPGN(strings.NewReader(req.Pgn))
+	// Parse PGN using our custom parser
+	game, err := parsePGN(req.Pgn)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid PGN: %v", err)
 	}
@@ -170,8 +239,8 @@ func (s *ChessAnalysisServer) AnalyzePGNDetailed(ctx context.Context, req *pb.An
 		return nil, status.Errorf(codes.InvalidArgument, "depth cannot exceed %d", maxAnalysisDepth)
 	}
 
-	// Parse PGN
-	game, err := chess.NewGameFromPGN(strings.NewReader(req.Pgn))
+	// Parse PGN using our custom parser
+	game, err := parsePGN(req.Pgn)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid PGN: %v", err)
 	}
@@ -352,9 +421,9 @@ func (s *ChessAnalysisServer) determineGamePhase(pos *chess.Position, moveNumber
 	board := pos.Board()
 	for sq := chess.A1; sq <= chess.H8; sq++ {
 		piece := board.Piece(sq)
-		if piece != chess.NoPiece && 
-		   piece.Type() != chess.Pawn && 
-		   piece.Type() != chess.King {
+		if piece != chess.NoPiece &&
+			piece.Type() != chess.Pawn &&
+			piece.Type() != chess.King {
 			pieceCount++
 		}
 	}
