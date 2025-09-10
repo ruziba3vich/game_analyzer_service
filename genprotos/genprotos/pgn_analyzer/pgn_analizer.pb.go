@@ -397,6 +397,7 @@ type PhaseStatsByPhase struct {
 	Opening       *PhaseStats            `protobuf:"bytes,1,opt,name=opening,proto3" json:"opening,omitempty"`
 	Middlegame    *PhaseStats            `protobuf:"bytes,2,opt,name=middlegame,proto3" json:"middlegame,omitempty"`
 	Endgame       *PhaseStats            `protobuf:"bytes,3,opt,name=endgame,proto3" json:"endgame,omitempty"`
+	Overall       *PhaseStats            `protobuf:"bytes,4,opt,name=overall,proto3" json:"overall,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -448,6 +449,13 @@ func (x *PhaseStatsByPhase) GetMiddlegame() *PhaseStats {
 func (x *PhaseStatsByPhase) GetEndgame() *PhaseStats {
 	if x != nil {
 		return x.Endgame
+	}
+	return nil
+}
+
+func (x *PhaseStatsByPhase) GetOverall() *PhaseStats {
+	if x != nil {
+		return x.Overall
 	}
 	return nil
 }
@@ -723,13 +731,14 @@ const file_pgn_analizer_protos_pgn_analizer_proto_rawDesc = "" +
 	"blackStats\x12\x1f\n" +
 	"\vtotal_moves\x18\x05 \x01(\x05R\n" +
 	"totalMoves\x12%\n" +
-	"\x0eanalysis_depth\x18\x06 \x01(\x05R\ranalysisDepth\"\xb5\x01\n" +
+	"\x0eanalysis_depth\x18\x06 \x01(\x05R\ranalysisDepth\"\xe9\x01\n" +
 	"\x11PhaseStatsByPhase\x122\n" +
 	"\aopening\x18\x01 \x01(\v2\x18.pgn_analyzer.PhaseStatsR\aopening\x128\n" +
 	"\n" +
 	"middlegame\x18\x02 \x01(\v2\x18.pgn_analyzer.PhaseStatsR\n" +
 	"middlegame\x122\n" +
-	"\aendgame\x18\x03 \x01(\v2\x18.pgn_analyzer.PhaseStatsR\aendgame\"\x92\x01\n" +
+	"\aendgame\x18\x03 \x01(\v2\x18.pgn_analyzer.PhaseStatsR\aendgame\x122\n" +
+	"\aoverall\x18\x04 \x01(\v2\x18.pgn_analyzer.PhaseStatsR\aoverall\"\x92\x01\n" +
 	"\n" +
 	"PhaseStats\x12\x1d\n" +
 	"\n" +
@@ -804,19 +813,20 @@ var file_pgn_analizer_protos_pgn_analizer_proto_depIdxs = []int32{
 	7,  // 6: pgn_analyzer.PhaseStatsByPhase.opening:type_name -> pgn_analyzer.PhaseStats
 	7,  // 7: pgn_analyzer.PhaseStatsByPhase.middlegame:type_name -> pgn_analyzer.PhaseStats
 	7,  // 8: pgn_analyzer.PhaseStatsByPhase.endgame:type_name -> pgn_analyzer.PhaseStats
-	0,  // 9: pgn_analyzer.HealthCheckResponse.status:type_name -> pgn_analyzer.HealthCheckResponse.ServingStatus
-	1,  // 10: pgn_analyzer.AnalysisError.code:type_name -> pgn_analyzer.AnalysisError.ErrorCode
-	2,  // 11: pgn_analyzer.ChessAnalysisService.AnalyzePGN:input_type -> pgn_analyzer.AnalyzePGNRequest
-	2,  // 12: pgn_analyzer.ChessAnalysisService.AnalyzePGNDetailed:input_type -> pgn_analyzer.AnalyzePGNRequest
-	8,  // 13: pgn_analyzer.ChessAnalysisService.HealthCheck:input_type -> pgn_analyzer.HealthCheckRequest
-	3,  // 14: pgn_analyzer.ChessAnalysisService.AnalyzePGN:output_type -> pgn_analyzer.AnalyzePGNResponse
-	5,  // 15: pgn_analyzer.ChessAnalysisService.AnalyzePGNDetailed:output_type -> pgn_analyzer.DetailedAnalysisResponse
-	9,  // 16: pgn_analyzer.ChessAnalysisService.HealthCheck:output_type -> pgn_analyzer.HealthCheckResponse
-	14, // [14:17] is the sub-list for method output_type
-	11, // [11:14] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	7,  // 9: pgn_analyzer.PhaseStatsByPhase.overall:type_name -> pgn_analyzer.PhaseStats
+	0,  // 10: pgn_analyzer.HealthCheckResponse.status:type_name -> pgn_analyzer.HealthCheckResponse.ServingStatus
+	1,  // 11: pgn_analyzer.AnalysisError.code:type_name -> pgn_analyzer.AnalysisError.ErrorCode
+	2,  // 12: pgn_analyzer.ChessAnalysisService.AnalyzePGN:input_type -> pgn_analyzer.AnalyzePGNRequest
+	2,  // 13: pgn_analyzer.ChessAnalysisService.AnalyzePGNDetailed:input_type -> pgn_analyzer.AnalyzePGNRequest
+	8,  // 14: pgn_analyzer.ChessAnalysisService.HealthCheck:input_type -> pgn_analyzer.HealthCheckRequest
+	3,  // 15: pgn_analyzer.ChessAnalysisService.AnalyzePGN:output_type -> pgn_analyzer.AnalyzePGNResponse
+	5,  // 16: pgn_analyzer.ChessAnalysisService.AnalyzePGNDetailed:output_type -> pgn_analyzer.DetailedAnalysisResponse
+	9,  // 17: pgn_analyzer.ChessAnalysisService.HealthCheck:output_type -> pgn_analyzer.HealthCheckResponse
+	15, // [15:18] is the sub-list for method output_type
+	12, // [12:15] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_pgn_analizer_protos_pgn_analizer_proto_init() }

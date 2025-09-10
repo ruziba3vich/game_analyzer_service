@@ -224,56 +224,6 @@ func (s *ChessAnalysisServer) AnalyzePGN(ctx context.Context, req *pb.AnalyzePGN
 	}, nil
 }
 
-// AnalyzePGNDetailed implements the detailed analysis RPC
-func (s *ChessAnalysisServer) AnalyzePGNDetailed(ctx context.Context, req *pb.AnalyzePGNRequest) (*pb.DetailedAnalysisResponse, error) {
-	// Validate request (same as AnalyzePGN)
-	if req.Pgn == "" {
-		return nil, status.Error(codes.InvalidArgument, "PGN cannot be empty")
-	}
-
-	depth := req.Depth
-	if depth <= 0 {
-		depth = defaultAnalysisDepth
-	}
-	if depth > maxAnalysisDepth {
-		return nil, status.Errorf(codes.InvalidArgument, "depth cannot exceed %d", maxAnalysisDepth)
-	}
-
-	// Parse PGN using our custom parser
-	game, err := parsePGN(req.Pgn)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid PGN: %v", err)
-	}
-
-	moves := game.Moves()
-	if len(moves) < minMovesForAnalysis {
-		return nil, status.Errorf(codes.InvalidArgument, "game too short for analysis")
-	}
-
-	// Perform detailed analysis
-	whiteStats, blackStats, totalMoves, err := s.analyzeGameDetailed(ctx, game, int(depth))
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "detailed analysis failed: %v", err)
-	}
-
-	return &pb.DetailedAnalysisResponse{
-		White: &pb.PlayerEloAnalysis{
-			Opening:    whiteStats.Opening.EstimatedElo,
-			Middlegame: whiteStats.Middlegame.EstimatedElo,
-			Endgame:    whiteStats.Endgame.EstimatedElo,
-		},
-		Black: &pb.PlayerEloAnalysis{
-			Opening:    blackStats.Opening.EstimatedElo,
-			Middlegame: blackStats.Middlegame.EstimatedElo,
-			Endgame:    blackStats.Endgame.EstimatedElo,
-		},
-		WhiteStats:    whiteStats,
-		BlackStats:    blackStats,
-		TotalMoves:    int32(totalMoves),
-		AnalysisDepth: int32(depth),
-	}, nil
-}
-
 // HealthCheck implements the health check RPC
 func (s *ChessAnalysisServer) HealthCheck(ctx context.Context, req *pb.HealthCheckRequest) (*pb.HealthCheckResponse, error) {
 	return &pb.HealthCheckResponse{
@@ -434,6 +384,7 @@ func (s *ChessAnalysisServer) determineGamePhase(pos *chess.Position, moveNumber
 	return Endgame
 }
 
+// Update the calculatePlayerElo function to include overall ELO calculation
 func (s *ChessAnalysisServer) calculatePlayerElo(evaluations []MoveEvaluation, color chess.Color) *pb.PlayerEloAnalysis {
 	phaseACPL := map[GamePhase][]int{
 		Opening:    {},
@@ -441,9 +392,13 @@ func (s *ChessAnalysisServer) calculatePlayerElo(evaluations []MoveEvaluation, c
 		Endgame:    {},
 	}
 
+	// Collect all centipawn losses for overall calculation
+	var allLosses []int
+
 	for _, eval := range evaluations {
 		if eval.PlayerColor == color {
 			phaseACPL[eval.Phase] = append(phaseACPL[eval.Phase], eval.CentipawnLoss)
+			allLosses = append(allLosses, eval.CentipawnLoss)
 		}
 	}
 
@@ -451,9 +406,11 @@ func (s *ChessAnalysisServer) calculatePlayerElo(evaluations []MoveEvaluation, c
 		Opening:    int32(s.acplToElo(phaseACPL[Opening])),
 		Middlegame: int32(s.acplToElo(phaseACPL[Middlegame])),
 		Endgame:    int32(s.acplToElo(phaseACPL[Endgame])),
+		Overall:    int32(s.acplToElo(allLosses)), // Calculate overall ELO from all moves
 	}
 }
 
+// Also update the calculateDetailedStats function to include overall ELO
 func (s *ChessAnalysisServer) calculateDetailedStats(evaluations []MoveEvaluation, color chess.Color) *pb.PhaseStatsByPhase {
 	phaseACPL := map[GamePhase][]int{
 		Opening:    {},
@@ -461,9 +418,13 @@ func (s *ChessAnalysisServer) calculateDetailedStats(evaluations []MoveEvaluatio
 		Endgame:    {},
 	}
 
+	// Collect all losses for overall calculation
+	var allLosses []int
+
 	for _, eval := range evaluations {
 		if eval.PlayerColor == color {
 			phaseACPL[eval.Phase] = append(phaseACPL[eval.Phase], eval.CentipawnLoss)
+			allLosses = append(allLosses, eval.CentipawnLoss)
 		}
 	}
 
@@ -471,7 +432,60 @@ func (s *ChessAnalysisServer) calculateDetailedStats(evaluations []MoveEvaluatio
 		Opening:    s.calculatePhaseStats(phaseACPL[Opening]),
 		Middlegame: s.calculatePhaseStats(phaseACPL[Middlegame]),
 		Endgame:    s.calculatePhaseStats(phaseACPL[Endgame]),
+		Overall:    s.calculatePhaseStats(allLosses), // Add overall stats
 	}
+}
+
+// Update the AnalyzePGNDetailed function to include overall ELO in response
+func (s *ChessAnalysisServer) AnalyzePGNDetailed(ctx context.Context, req *pb.AnalyzePGNRequest) (*pb.DetailedAnalysisResponse, error) {
+	// Validate request (same as AnalyzePGN)
+	if req.Pgn == "" {
+		return nil, status.Error(codes.InvalidArgument, "PGN cannot be empty")
+	}
+
+	depth := req.Depth
+	if depth <= 0 {
+		depth = defaultAnalysisDepth
+	}
+	if depth > maxAnalysisDepth {
+		return nil, status.Errorf(codes.InvalidArgument, "depth cannot exceed %d", maxAnalysisDepth)
+	}
+
+	// Parse PGN using our custom parser
+	game, err := parsePGN(req.Pgn)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid PGN: %v", err)
+	}
+
+	moves := game.Moves()
+	if len(moves) < minMovesForAnalysis {
+		return nil, status.Errorf(codes.InvalidArgument, "game too short for analysis")
+	}
+
+	// Perform detailed analysis
+	whiteStats, blackStats, totalMoves, err := s.analyzeGameDetailed(ctx, game, int(depth))
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "detailed analysis failed: %v", err)
+	}
+
+	return &pb.DetailedAnalysisResponse{
+		White: &pb.PlayerEloAnalysis{
+			Opening:    whiteStats.Opening.EstimatedElo,
+			Middlegame: whiteStats.Middlegame.EstimatedElo,
+			Endgame:    whiteStats.Endgame.EstimatedElo,
+			Overall:    whiteStats.Overall.EstimatedElo,
+		},
+		Black: &pb.PlayerEloAnalysis{
+			Opening:    blackStats.Opening.EstimatedElo,
+			Middlegame: blackStats.Middlegame.EstimatedElo,
+			Endgame:    blackStats.Endgame.EstimatedElo,
+			Overall:    blackStats.Overall.EstimatedElo,
+		},
+		WhiteStats:    whiteStats,
+		BlackStats:    blackStats,
+		TotalMoves:    int32(totalMoves),
+		AnalysisDepth: int32(depth),
+	}, nil
 }
 
 func (s *ChessAnalysisServer) calculatePhaseStats(losses []int) *pb.PhaseStats {
