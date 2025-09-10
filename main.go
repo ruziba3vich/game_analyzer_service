@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"regexp"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -249,8 +250,22 @@ func (s *ChessAnalysisServer) analyzeGameMoves(ctx context.Context, game *chess.
 		return nil, nil, err
 	}
 
-	whiteElo := s.calculatePlayerElo(evaluations, chess.White)
-	blackElo := s.calculatePlayerElo(evaluations, chess.Black)
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	var whiteElo, blackElo *pb.PlayerEloAnalysis
+
+	go func() {
+		defer wg.Done()
+		whiteElo = s.calculatePlayerElo(evaluations, chess.White)
+	}()
+
+	go func() {
+		defer wg.Done()
+		blackElo = s.calculatePlayerElo(evaluations, chess.Black)
+	}()
+
+	wg.Wait()
 
 	return whiteElo, blackElo, nil
 }
@@ -262,10 +277,21 @@ func (s *ChessAnalysisServer) analyzeGameDetailed(ctx context.Context, game *che
 		return nil, nil, 0, err
 	}
 
-	whiteStats := s.calculateDetailedStats(evaluations, chess.White)
-	blackStats := s.calculateDetailedStats(evaluations, chess.Black)
+	var whiteStats, blackStats pb.PhaseStatsByPhase
+	var wg sync.WaitGroup
+	wg.Add(2)
 
-	return whiteStats, blackStats, len(moves), nil
+	f := func(stats *pb.PhaseStatsByPhase, color chess.Color) {
+		defer wg.Done()
+		stats = s.calculateDetailedStats(evaluations, color)
+	}
+
+	go f(&whiteStats, chess.White)
+	go f(&blackStats, chess.Black)
+
+	wg.Wait()
+
+	return &whiteStats, &blackStats, len(moves), nil
 }
 
 func (s *ChessAnalysisServer) evaluateAllMoves(ctx context.Context, originalGame *chess.Game, depth int) ([]MoveEvaluation, error) {
@@ -402,11 +428,27 @@ func (s *ChessAnalysisServer) calculatePlayerElo(evaluations []MoveEvaluation, c
 		}
 	}
 
+	var v1, v2, v3, v4 int32
+	var wg sync.WaitGroup
+	wg.Add(4)
+
+	f := func(v *int32, arr []int) {
+		defer wg.Done()
+		*v = int32(s.acplToElo(arr))
+	}
+
+	go f(&v1, phaseACPL[Opening])
+	go f(&v2, phaseACPL[Middlegame])
+	go f(&v3, phaseACPL[Endgame])
+	go f(&v4, allLosses)
+
+	wg.Wait()
+
 	return &pb.PlayerEloAnalysis{
-		Opening:    int32(s.acplToElo(phaseACPL[Opening])),
-		Middlegame: int32(s.acplToElo(phaseACPL[Middlegame])),
-		Endgame:    int32(s.acplToElo(phaseACPL[Endgame])),
-		Overall:    int32(s.acplToElo(allLosses)), // Calculate overall ELO from all moves
+		Opening:    v1,
+		Middlegame: v2,
+		Endgame:    v3,
+		Overall:    v4,
 	}
 }
 
@@ -432,7 +474,7 @@ func (s *ChessAnalysisServer) calculateDetailedStats(evaluations []MoveEvaluatio
 		Opening:    s.calculatePhaseStats(phaseACPL[Opening]),
 		Middlegame: s.calculatePhaseStats(phaseACPL[Middlegame]),
 		Endgame:    s.calculatePhaseStats(phaseACPL[Endgame]),
-		Overall:    s.calculatePhaseStats(allLosses), // Add overall stats
+		Overall:    s.calculatePhaseStats(allLosses), // TODO
 	}
 }
 
